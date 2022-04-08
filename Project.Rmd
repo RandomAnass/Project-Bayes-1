@@ -12,6 +12,14 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+#install.packages("truncnorm")
+#install.packages("invgamma")
+library(invgamma)
+library(truncnorm)
+# library(acp)
+```
 ```
 
 # Introduction
@@ -45,3 +53,210 @@ plot(pressure)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+
+
+
+## Présentation des données:
+
+
+
+Tout d'abord pour la culture, le Dugong est un mammiphère sous-marin herbivore aussi nommé vache sous-marine. Il vit sur les littoraux des océans Indiens et Pacifique. Il en reste aujourd'hui moins de 40 000.\
+
+Les données se présentent sous la forme d'un tableau à deux entrées. L'entrée X représente l'âge des 27 dugongs et l'entrée Y leurs tailles. On propose dans ce projet de construire un modèle bayésien pour modèliser la taille des dugongs en fonction de leur âge.
+
+```{r initialisation des données}
+X <- c(1, 1.5, 1.5, 1.5, 2.5, 4, 5, 5, 7, 8, 8.5, 9, 9.5, 9.5, 10, 
+12, 12, 13, 13, 14.5, 15.5, 15.5, 16.5, 17, 22.5, 29, 31.5)
+Y <- c(1.8, 1.85, 1.87, 1.77, 2.02, 2.27, 2.15, 2.26, 2.47, 2.19, 
+2.26, 2.4, 2.39, 2.41, 2.5, 2.32, 2.32, 2.43, 2.47, 2.56, 2.65, 
+2.47, 2.64, 2.56, 2.7, 2.72, 2.57)
+data <- data.frame(X,Y)
+ggplot(data,mapping = aes(X,Y))+
+  geom_point()+
+  geom_smooth()+
+  ggtitle("Evolution de la longueur des Dugongs en fonction de l'age") +
+  xlab("age") + ylab("Longeur")
+```
+
+On remarque que l'evolution de la longeur ("The growth") est non linéaire, et tend vers une valeur constante, ainsi on a choisi pour modèle de dépendance entre X(l'age) et Y(la longeur) un modèle de régression non linéaire appelé (asymptotic regression model) on trouve dans la littérature d'autres modèles similaire pour modéliser les courbes d'évolution :
+
+-   modified exponential (Stevens (1951), c'est le type de modèle employé essayé) $$
+    \mathbb{E}(Y)=\alpha-\beta^{X}
+    $$
+
+-   logistic (von Bertalanffy (1957) )
+
+-   Gomprtz (Richards (1959). )
+
+```{r Y distribution}
+y <- density(data$Y)
+plot(y)
+```
+
+En faisant l'estimation non paramétriques de la densité des valeurs de Y on retrouve une densité qui laisse penser qu'on a affaire à une somme de densité normale, d'où le choix de la modélisation suivante: $$
+Y_{i} \sim \operatorname{Normal}\left(\mu_{i}, \tau\right), \quad i=1, \ldots, 27$$
+
+$$\mu_{i}=\alpha-\beta \gamma^{X} \quad \alpha, \beta>1 ; 0<\gamma<1
+$$
+
+Ainsi pour des grandes valeurs de X (l'age) la moyenne est presque inchangé vu que \$ \gama \$ est inférieur à 1, ce qui est cohérant parceque les dugongs les plus agés ont presque la même longeur qui tourne autour de 2.5 alors que les moins agés ont une logueur qui tourne autour de 1.7.
+
+\#\# Calculs
+
+$$
+\pi(\alpha \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\alpha)
+\\
+\pi(\alpha \mid \ldots) \propto \prod_{i=1}^{n}\left[\tau^{1/2}e^{-\frac{\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau}{2}}\right]\times \pi(\alpha)
+\\
+\\ \text{avec }\pi(\alpha) \propto e^ \left(-\frac{\alpha^{2}.10^{-6}}{2}\right) 
+\\
+\pi(\alpha \mid \ldots) \propto  \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times {e^ \left(-\frac{\alpha^{2}.10^{-6}}{2}\right) }
+$$
+
+$$
+\pi(\beta \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\beta)
+\\
+\pi(\beta \mid \ldots) \propto \prod_{i=1}^{n}\left[\tau^{1/2}e^{-\frac{\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau}{2}}\right]\times \pi(\beta)
+\\ \text{avec }\pi(\beta) \propto e^ \left(-\frac{\beta^{2}.10^{-6}}{2}\right) 
+\\
+\pi(\beta \mid \ldots) \propto \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times e^ \left(-\frac{\beta^{2}.10^{-6}}{2}\right) 
+$$
+
+$$
+\pi(\gamma \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\gamma)
+\\
+\pi(\gamma \mid \ldots) \propto \prod_{i=1}^{n}\left[\tau^{1/2}e^{-\frac{\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau}{2}}\right] \times \pi(\gamma)
+\\
+\pi(\gamma \mid \ldots) \propto \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times \mathbb{1_{]0,1[}{\gamma}}
+$$
+
+$$
+\pi(\tau \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\tau)
+\\
+\text{avec }\pi(\tau)\,\sim \Gamma (0.001,0.001 )
+\\
+\pi(\tau \mid \ldots) \propto \prod_{i=1}^{n}\left[\tau^{1/2}e^{-\frac{\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau}{2}}\right] \times \frac{1}{\tau}\times \mathbb{1_{[0,+\infty[}{\tau}}
+\\
+\\
+\pi(\tau \mid \ldots) \propto  \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times \frac{1}{\tau}\times \mathbb{1_{[0,+\infty[}{\tau}}e
+$$
+
+## Codes:
+
+```{r}
+dugong <- function(age, Y, nchain = 10^4, prop_sd = c(0.1,1,1,1)){
+  init <- c(1,1,1,0.9)  #alpha, beta (alpha et beta superieur à 1), tau (standard deviation donc on commence à 1) et gamma (entre 0 et 1 donc on prend 0.5)   
+  chain <- matrix(NA, nchain + 1, 4)
+  chain[1,] <- init
+  acc_rates <- rep(0, 4)
+  n<-length(Y)
+  sig<-1000#ecart type
+  for (iter in 1:nchain){
+    current <- chain[iter,]
+    
+    ## Mise a jour de alpha, beta .
+    
+    for (j in 1:2){
+      prop <- current
+      prop[j] <- rlnorm(1 ,meanlog = log(current[j]),prop_sd[j])
+      kernel.ratio<-(prop[j]/current[j])
+      top<-sum(dnorm(Y,prop[1] + prop[2]*prop[4]^age,1/sqrt(prop[3]),log=TRUE))+dnorm(prop[j],0,sig,log=TRUE)
+      #Bottom 
+      bottom <- sum(dnorm(Y,current[1] +current[2]*current[4]^age,1/sqrt(current[3]),log=TRUE))+dnorm(current[j],0,sig,log=TRUE)
+      #Alpha
+      acc_prob <- exp(top - bottom)*kernel.ratio
+      
+      if (runif(1) < acc_prob){
+              current <- prop
+              acc_rates[j] <- acc_rates[j] + 1
+             }
+    
+           }
+  
+  
+    ## Mise à jour de tau   
+      prop <- current
+      prop[3] <- rlnorm(1 ,meanlog = log(current[3]),prop_sd[3])
+     
+      kernel.ratio<-(prop[3]/current[3])
+      
+      #Top
+      top <- sum(dnorm(Y,prop[1] + prop[2]*prop[4]^age,1/sqrt(prop[3]),log=TRUE))+dgamma(prop[3],0.001,rate=0.001,log=TRUE)
+      bottom <-sum(dnorm(Y,current[1] + current[2]*current[4]^age,1/sqrt(current[3]),log=TRUE))+dgamma(current[3],0.001,rate=0.001,log=TRUE)   
+      
+      acc_prob <- exp(top - bottom)*kernel.ratio
+      
+      if (runif(1) < acc_prob){
+              current <- prop
+              acc_rates[3] <- acc_rates[3] + 1
+             }
+   ### Mise à jour de gamma
+      prop <- current
+      prop[4] <- rlnorm(1, meanlog = log(current[4]), prop_sd[4])
+     
+      kernel.ratio<-(prop[4]/current[4])
+      top <-sum(dnorm(Y,prop[1] + prop[2]*prop[4]^age,1/sqrt(prop[3]),log=TRUE))+dunif(prop[4],min=0.5,max=1,log=TRUE)
+      bottom <- sum(dnorm(Y,current[1] + current[2]*current[4]^age,1/sqrt(current[3]),log=TRUE))+dunif(current[4],min=0.5,max=1,log=TRUE)
+      #Alpha
+      acc_prob <- exp(top - bottom)*kernel.ratio
+    
+      if ((runif(1) < acc_prob)&(prop[4]<1)){
+              current <- prop
+              acc_rates[4] <- acc_rates[4] + 1
+             } 
+    ## Sauvegardons le nouvel etat
+    chain[iter+1,] <- current
+  }
+  
+  return(list(chain = chain, acc_rates = acc_rates / nchain))
+}
+nchain=10000
+CM_params <- dugong(X, Y, nchain )
+#CM_params
+## remove burning period
+#CM_params$chain <- CM_params$chain[-(1:1000),]
+expression<-c('alpha','beta','tau','gamma')
+#plot
+for (j in 1:4)
+  plot(CM_params$chain[,j], type = "l", ylab = expression[j])
+```
+
+```{r}
+#le taux d'acceaptation
+CM_params$acc_rates
+```
+
+```{r}
+#ACP
+#acp(CM_params$chain )
+```
+
+```{r}
+tail(CM_params$chain,5)
+```
+
+```{r}
+```
+
+```{r}
+#on trace les densité 
+par(mfrow = c(1, 2), mar = c(4, 5, 0.5, 0.5))
+for (j in 1:4)
+  plot(density(CM_params$chain[,j]), type = "l", ylab = expression[j])
+```
+
+```{r}
+#on trace les densité 
+par(mfrow = c(1, 2), mar = c(4, 5, 0.5, 0.5))
+density(CM_params$chain[,2])
+```
+
+```{r}
+```
+
+## Sources
+
+<https://www.wwf.fr/especes-prioritaires/dugong>
