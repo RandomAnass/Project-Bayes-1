@@ -240,6 +240,8 @@ plot(params$chain[,1], type = "line", ylab = "alpha")
 ```
 
 
-## Bibliographie
+# Bibliographie
 
 [1] <https://fr.wikipedia.org/wiki/Dugong>
+
+# Le lien vers le dépôt github : [https://github.com/RandomAnass/Project-Bayes-1](https://github.com/RandomAnass/Project-Bayes-1) 
