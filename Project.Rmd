@@ -59,7 +59,6 @@ On observe qu'il y a une tendance générale à ce que la longueur augmente avec
  
 
 ```{r }
-
 hc <- hchart(
   density(data$Length_Y), 
   type = "area", name = "La longueur"
@@ -107,15 +106,6 @@ $$
 \pi(\alpha \mid \ldots) \propto  \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times {e^ \left(-\frac{\alpha^{2}.10^{-6}}{2}\right) }
 $$
 
-
-$$
-\pi(\gamma \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\gamma)
-\\
-\pi(\gamma \mid \ldots) \propto \prod_{i=1}^{n}\left[\tau^{1/2}e^{-\frac{\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau}{2}}\right] \times \pi(\gamma)
-\\
-\pi(\gamma \mid \ldots) \propto \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times \mathbb{1_{]0,1[}{\gamma}}
-$$
-
 $$
 \pi(\tau \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\tau)
 \\
@@ -126,3 +116,124 @@ $$
 \\
 \pi(\tau \mid \ldots) \propto  \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times \frac{1}{\tau}\times \mathbb{1_{[0,+\infty[}{\tau}}e
 $$
+
+$$
+\pi(\gamma \mid \ldots) \propto \prod_{i=1}^{n} \pi\left(y_{i} \mid \alpha, \beta, \gamma, \tau\right) \times \pi(\gamma)
+\\
+\pi(\gamma \mid \ldots) \propto \prod_{i=1}^{n}\left[\tau^{1/2}e^{-\frac{\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau}{2}}\right] \times \pi(\gamma)
+\\
+\pi(\gamma \mid \ldots) \propto \tau^{n/2}\times e^{-\frac{\sum_{i=1}^{n}\left[\left(Y_{i}-\alpha+\beta\gamma^{x_{i}}\right)^{2}\tau\right]}{2}}\times \mathbb{1_{]0,1[}{\gamma}}
+$$
+
+
+
+
+## Codes:
+
+```{r}
+dugong <- function(age, Y, nc = 10^4, prop_sd = c(0.1,1,1,1)){
+  init <- c(2,1.5,1,0.9)   
+  chain <- matrix(NA, nc + 1, 4)
+  chain[1,] <- init
+  acc_rates <- rep(0, 4)
+  n<-length(Y)
+  sig<-1000 #car on doit prendre une grande variance
+  for (iter in 1:nc){
+    current <- chain[iter,]
+    for (j in 1:2){
+      prop <- current
+      prop[j] <- rlnorm(1 ,meanlog = log(current[j]),prop_sd[j])
+      kernel.ratio<-(prop[j]/current[j])
+      top<-sum(dnorm(Y,prop[1] + prop[2]*prop[4]^age,1/sqrt(prop[3]),log=TRUE))+dnorm(prop[j],0,sig,log=TRUE)
+
+      bottom <- sum(dnorm(Y,current[1]+current[2]*current[4]^age,1/sqrt(current[3]),log=TRUE))+dnorm(current[j],0,sig,log=TRUE)
+      acc_prob <- exp(top - bottom)*kernel.ratio
+      
+      if (runif(1) < acc_prob){
+              current <- prop
+              acc_rates[j] <- acc_rates[j] + 1
+             }
+           }
+      prop <- current
+      prop[3] <- rlnorm(1 ,meanlog = log(current[3]),prop_sd[3])
+     
+      kernel.ratio<-(prop[3]/current[3])
+
+      top <- sum(dnorm(Y,prop[1] + prop[2]*prop[4]^age,1/sqrt(prop[3]),log=TRUE))+dgamma(prop[3],0.001,rate=0.001,log=TRUE)
+      bottom <-sum(dnorm(Y,current[1] + current[2]*current[4]^age,1/sqrt(current[3]),log=TRUE))+dgamma(current[3],0.001,rate=0.001,log=TRUE)   
+      
+      acc_prob <- exp(top - bottom)*kernel.ratio
+      
+      if (runif(1) < acc_prob){
+              current <- prop
+              acc_rates[3] <- acc_rates[3] + 1
+             }
+      prop <- current
+      prop[4] <- rlnorm(1, meanlog = log(current[4]), prop_sd[4])
+     
+      kernel.ratio<-(prop[4]/current[4])
+      top <-sum(dnorm(Y,prop[1] + prop[2]*prop[4]^age,1/sqrt(prop[3]),log=TRUE))+dunif(prop[4],min=0.5,max=1,log=TRUE)
+      bottom <- sum(dnorm(Y,current[1] + current[2]*current[4]^age,1/sqrt(current[3]),log=TRUE))+dunif(current[4],min=0.5,max=1,log=TRUE)
+      acc_prob <- exp(top - bottom)*kernel.ratio
+    
+      if ((runif(1) < acc_prob)&(prop[4]<1)){
+              current <- prop
+              acc_rates[4] <- acc_rates[4] + 1
+             } 
+    chain[iter+1,] <- current
+  }
+  return(list(chain = chain, acc_rates = acc_rates / nc))
+}
+
+```
+```{r}
+nc=10000
+params <- dugong(X, Y, nc )
+```
+
+```{r}
+hc <- hchart(
+  density(params$chain[,1]), 
+  type = "line", name = "alpha"
+  )
+hc
+```
+```{r}
+hc <- hchart(
+  density(params$chain[,2]), 
+  type = "line", name = "beta"
+  )
+hc
+```
+```{r}
+hc <- hchart(
+  density(params$chain[,3]), 
+  type = "line", name = "tau"
+  )
+hc
+```
+```{r}
+hc <- hchart(
+  density(params$chain[,4]), 
+  type = "line", name = "gamma"
+  )
+hc
+```
+
+
+
+```{r}
+print("Taux d'acceaptation")
+params$acc_rates
+```
+
+
+```{r}
+tail(params$chain,5)
+```
+
+
+
+## Sources
+
+[1] <https://fr.wikipedia.org/wiki/Dugong>
