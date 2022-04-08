@@ -128,7 +128,7 @@ $$
 
 
 
-## Codes:
+## La fonction:
 
 ```{r}
 dugong <- function(age, Y, nc = 10^4, prop_sd = c(0.1,1,1,1)){
@@ -190,7 +190,7 @@ dugong <- function(age, Y, nc = 10^4, prop_sd = c(0.1,1,1,1)){
 nc=10000
 params <- dugong(X, Y, nc )
 ```
-
+# Résultats:
 ```{r}
 hc <- hchart(
   density(params$chain[,1]), 
@@ -229,11 +229,17 @@ params$acc_rates
 
 
 ```{r}
-tail(params$chain,5)
+tail(params$chain)
+```
+
+Pour alpha nous avons obtenu le même résultat que dans le document que nous avions. pour les autres nous avons quelques différences, (la série n'est pas vraiment aussi lisse, mais avec highcharter nous pouvons voir les changements de façon plus régulière).
+Par exemple le graphique de alpha :
+  
+```{r}
+plot(params$chain[,1], type = "line", ylab = "alpha")
 ```
 
 
-
-## Sources
+## Bibliographie
 
 [1] <https://fr.wikipedia.org/wiki/Dugong>
